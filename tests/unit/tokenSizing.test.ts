@@ -10,9 +10,10 @@ describe('token size options', () => {
   });
 
   it('maps creature size words to stored multipliers and ignores unknown values', () => {
+    expect(tokenSizeFromCreatureSize('Tiny')).toBe(0.25);
+    expect(tokenSizeFromCreatureSize('Small')).toBe(0.5);
     expect(tokenSizeFromCreatureSize('Large')).toBe(1.5);
     expect(tokenSizeFromCreatureSize(' huge or larger ')).toBe(2);
-    expect(tokenSizeFromCreatureSize('Tiny')).toBe(1);
     expect(tokenSizeFromCreatureSize('Colossal')).toBeUndefined();
     expect(tokenSizeFromCreatureSize(undefined)).toBeUndefined();
   });

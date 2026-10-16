@@ -3,6 +3,7 @@ import { gridOffsetCenteredAt, normaliseGridOffset, resizedTokenCenter, snapToke
 import { axialToPixel, createHexLayout, hexCellExtent, hexCircumradius, nearestHexCenter } from '../../src/app/grid/hexGeometry';
 import type { HexGridType } from '../../src/app/grid/hexGeometry';
 import { freehandCellSize, FREEHAND_CELL_SCREEN_SIZE } from '../../src/app/pixi/FreehandGridPreview';
+import { tokenPlacementOffsets } from '../../src/app/pixi/token-renderer/tokenSizing';
 
 const HEX_TYPES: HexGridType[] = ['hex-vertical', 'hex-horizontal'];
 
@@ -68,6 +69,14 @@ describe('snapTokenCenter', () => {
     expect(snapTokenCenter({ x: 190, y: 130 }, size, 'square', CELL, toCell)).toEqual({ x: 215, y: 145 });
   });
 
+  it.each([0.25, 0.5])('snaps a small square-grid token to distinct subcell centres (size %s)', (size) => {
+    const offsets = tokenPlacementOffsets('square', size);
+    const centers = offsets.map(offset => snapTokenCenter(
+      { x: 35 + offset.x * CELL, y: 35 + offset.y * CELL }, size, 'square', CELL, toCell,
+    ));
+    expect(new Set(centers.map(center => `${center.x},${center.y}`)).size).toBe(offsets.length);
+  });
+
   describe.each(HEX_TYPES)('on %s grids', (type) => {
     const layout = createHexLayout(type, 64, 7, 3);
     const toHex = (point: { x: number; y: number }): { x: number; y: number } => nearestHexCenter(layout, point);
@@ -95,6 +104,16 @@ describe('snapTokenCenter', () => {
         expect(hexesMeetingAt(snapped)).toBe(3);
         expect(Math.hypot(snapped.x - point.x, snapped.y - point.y)).toBeLessThanOrEqual(64);
       }
+    });
+
+    it.each([0.25, 0.5])('snaps smaller tokens to distinct centres inside one %s hex', (size) => {
+      const center = toHex(points[0]!);
+      const offsets = tokenPlacementOffsets(type, size);
+      const snapped = offsets.map(offset => snapTokenCenter(
+        { x: center.x + offset.x * 64, y: center.y + offset.y * 64 }, size, type, 64, toHex,
+      ));
+      expect(new Set(snapped.map(point => `${point.x},${point.y}`)).size).toBe(offsets.length);
+      snapped.forEach(point => expect(toHex(point)).toEqual(center));
     });
 
     it.skipIf(type !== 'hex-vertical')('covers the hexes of the usual hex size chart', () => {

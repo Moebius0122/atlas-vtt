@@ -1,5 +1,6 @@
 import { axialToPixel, createHexLayout, pixelToAxial, type HexLayout } from '../grid/hexGeometry';
 import { tokenCenterShift } from '../grid/gridPlacement';
+import { tokenDiameterInCells, tokenPlacementOffsets } from '../pixi/token-renderer/tokenSizing';
 
 export type FormationGridType = 'square' | 'hex-horizontal' | 'hex-vertical';
 
@@ -137,25 +138,34 @@ function addCells(a: CellCoord, b: CellCoord): CellCoord {
 }
 
 /** Breadth-first search outward from `start` for the nearest cell not in `occupied`. */
-function nearestFreeCell(grid: FormationGrid, start: CellCoord, occupied: Set<string>): CellCoord {
-  if (!occupied.has(cellKey(start))) return start;
-
+function nearestFreePlacement(  grid: FormationGrid,  start: CellCoord,  size: number,  occupied: Map<string, Array<{ center: Point; size: number }>>): { cell: CellCoord; center: Point } {
   const neighbors = isHex(grid) ? HEX_NEIGHBORS : SQUARE_NEIGHBORS;
   const visited = new Set<string>([cellKey(start)]);
   const queue: CellCoord[] = [start];
 
   while (queue.length > 0 && visited.size < MAX_COLLISION_SEARCH) {
     const current = queue.shift()!;
+    const base = tokenWorldPosition(grid, current, size);
+    const candidates = tokenPlacementOffsets(grid.type, size).map(offset => ({
+      x: base.x + offset.x * grid.size,
+      y: base.y + offset.y * grid.size,
+    }));
+    const placedHere = occupied.get(cellKey(current)) ?? [];
+    const center = candidates.find(candidate => placedHere.every(other =>
+      Math.hypot(candidate.x - other.center.x, candidate.y - other.center.y) + 1e-6 >=
+        ((tokenDiameterInCells(size) + tokenDiameterInCells(other.size)) * grid.size) / 2,
+    ));
+    if (center) return { cell: current, center };
+
     for (const delta of neighbors) {
       const next = addCells(current, delta);
       const key = cellKey(next);
       if (visited.has(key)) continue;
-      if (!occupied.has(key)) return next;
       visited.add(key);
       queue.push(next);
     }
   }
-  return start;
+  return { cell: start, center: tokenWorldPosition(grid, start, size) };
 }
 
 /**
@@ -210,7 +220,7 @@ export function placeFormation(
   const anchorCell = worldToCell(grid, anchor);
   const anchorCenter = cellToWorld(grid, anchorCell);
   const targetPitch = cellPitch(grid);
-  const occupied = new Set<string>();
+  const occupied = new Map<string, Array<{ center: Point; size: number }>>();
 
   const anchorShift = tokenCenterShift(grid.type, grid.size, sizes[0] ?? 1);
 
@@ -223,8 +233,11 @@ export function placeFormation(
           y: anchorCenter.y + anchorShift.y + slot.offset.y * targetPitch,
           size,
         }));
-    const cell = nearestFreeCell(grid, desired, occupied);
-    occupied.add(cellKey(cell));
-    return tokenWorldPosition(grid, cell, size);
+    const placement = nearestFreePlacement(grid, desired, size, occupied);
+    const key = cellKey(placement.cell);
+    const cellTokens = occupied.get(key) ?? [];
+    cellTokens.push({ center: placement.center, size });
+    occupied.set(key, cellTokens);
+    return placement.center;
   });
 }

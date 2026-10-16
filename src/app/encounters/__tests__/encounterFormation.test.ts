@@ -185,6 +185,30 @@ describe('edge cases', () => {
 });
 
 describe('token sizes', () => {
+  it('fits four Small tokens into one square cell and moves the fifth to a neighbour', () => {
+    const grid = square(70);
+    const tokens = Array.from({ length: 5 }, () => ({ x: 35, y: 35, size: 0.5 }));
+    const { formation, slots } = captureFormation(tokens, grid);
+
+    const placed = placeFormation(slots, formation, { x: 35, y: 35 }, grid, tokens.map(token => token.size));
+
+    expect(placed.slice(0, 4).map(point => worldToCell(grid, point))).toEqual(Array.from({ length: 4 }, () => ({ q: 0, r: 0 })));
+    expect(worldToCell(grid, placed[4]!)).not.toEqual({ q: 0, r: 0 });
+    expect(new Set(placed.slice(0, 4).map(point => `${point.x},${point.y}`)).size).toBe(4);
+  });
+
+  it('fits four Tiny tokens into one hex cell', () => {
+    const grid = hexV(64);
+    const center = cellToWorld(grid, { q: 0, r: 0 });
+    const tokens = Array.from({ length: 4 }, () => ({ ...center, size: 0.25 }));
+    const { formation, slots } = captureFormation(tokens, grid);
+
+    const placed = placeFormation(slots, formation, center, grid, tokens.map(token => token.size));
+
+    expect(placed.map(point => worldToCell(grid, point))).toEqual(tokens.map(() => ({ q: 0, r: 0 })));
+    expect(new Set(placed.map(point => `${point.x},${point.y}`)).size).toBe(4);
+  });
+
   it('puts a Large token back on a grid intersection, with its neighbours where they stood', () => {
     const source = square(70);
     const target = square(100, 33, 17);

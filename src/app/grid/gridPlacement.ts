@@ -2,7 +2,7 @@ import type { GridType } from './GridSystem';
 import { createHexLayout, hexCellExtent, hexCircumradius, hexOrientationForGridType, isHexGridType } from './hexGeometry';
 import type { Point } from './hexGeometry';
 import type { GridOffset } from './gridOffset';
-import { tokenDiameterInCells } from '../pixi/token-renderer/tokenSizing';
+import { tokenDiameterInCells, tokenPlacementOffsets } from '../pixi/token-renderer/tokenSizing';
 
 // Offsets without token sizes live in `gridOffset.ts`, which grid detection's worker can import.
 export { normaliseGridOffset } from './gridOffset';
@@ -39,6 +39,17 @@ export function snapTokenCenter(
   cellSize: number,
   snapToCell: (point: Point) => Point,
 ): Point {
+  if (tokenSize < 1) {
+    const cell = snapToCell(point);
+    const offsets = tokenPlacementOffsets(gridType, tokenSize);
+    return offsets
+      .map(offset => ({ x: cell.x + offset.x * cellSize, y: cell.y + offset.y * cellSize }))
+      .reduce((nearest, candidate) =>
+        Math.hypot(candidate.x - point.x, candidate.y - point.y) < Math.hypot(nearest.x - point.x, nearest.y - point.y)
+          ? candidate
+          : nearest,
+      );
+  }
   const shift = tokenCenterShift(gridType, cellSize, tokenSize);
   const cell = snapToCell({ x: point.x - shift.x, y: point.y - shift.y });
   return { x: cell.x + shift.x, y: cell.y + shift.y };

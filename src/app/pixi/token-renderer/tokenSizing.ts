@@ -19,18 +19,51 @@ export function computeTokenStrokeWidth(gridSize: number): number {
 
 /** Diameter in cells covered by a token of the given size multiplier. */
 export function tokenDiameterInCells(sizeInCells: number): number {
-  return 2 * sizeInCells - 1;
+  return sizeInCells < 1 ? sizeInCells : 2 * sizeInCells - 1;
+}
+
+/** Candidate centres for fitting a smaller token inside one square or hex cell. */
+export function tokenPlacementOffsets(gridType: string | undefined, sizeInCells: number): { x: number; y: number }[] {
+  const diameter = tokenDiameterInCells(sizeInCells);
+  if (!(diameter > 0 && diameter < 1)) return [{ x: 0, y: 0 }];
+
+  const divisions = Math.round(1 / diameter);
+  if (Math.abs(divisions * diameter - 1) > 1e-6) return [{ x: 0, y: 0 }];
+
+  if (gridType === 'hex-vertical' && divisions === 2) {
+    const offset = diameter / 2;
+    return [{ x: -offset, y: 0 }, { x: offset, y: 0 }];
+  }
+  if (gridType === 'hex-horizontal' && divisions === 2) {
+    const offset = diameter / 2;
+    return [{ x: 0, y: -offset }, { x: 0, y: offset }];
+  }
+  if ((gridType === 'hex-vertical' || gridType === 'hex-horizontal') && divisions === 4) {
+    const offset = diameter / 2;
+    return [-1, 1].flatMap(x => [-1, 1].map(y => ({ x: x * offset, y: y * offset })));
+  }
+
+  return Array.from({ length: divisions * divisions }, (_, index) => {
+    const column = index % divisions;
+    const row = Math.floor(index / divisions);
+    return {
+      x: (column + 0.5) / divisions - 0.5,
+      y: (row + 0.5) / divisions - 0.5,
+    };
+  });
 }
 
 /** Named footprints offered in menus, stored as the multiplier `tokenDiameterInCells` expects. */
 export const TOKEN_SIZE_OPTIONS: ReadonlyArray<{ label: string; size: number }> = [
+  { label: t('token.size.tiny'), size: 0.25 },
+  { label: t('token.size.small'), size: 0.5 },
   { label: t('token.size.medium'), size: 1 },
   { label: t('token.size.large'), size: 1.5 },
   { label: t('token.size.huge'), size: 2 },
   { label: t('token.size.gargantuan'), size: 2.5 },
 ];
 
-const CREATURE_SIZE_MULTIPLIERS: Record<string, number> = { tiny: 1, small: 1, medium: 1, large: 1.5, huge: 2, gargantuan: 2.5 };
+const CREATURE_SIZE_MULTIPLIERS: Record<string, number> = { tiny: 0.25, small: 0.5, medium: 1, large: 1.5, huge: 2, gargantuan: 2.5 };
 
 /** Size multiplier for a creature size word from statblock data ("Large", "Huge or larger"); undefined when unknown. */
 export function tokenSizeFromCreatureSize(value: unknown): number | undefined {
